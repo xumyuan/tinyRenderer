@@ -6,14 +6,18 @@
 
 class Model {
 private:
-	std::vector<Vec3f> verts_;
+	std::vector<Vec3f> verts_;	// 顶点信息
+	std::vector<Vec2f> texts_;	// 纹理坐标信息
+	std::vector<Vec3f> norms_;	// 法线信息
 	std::vector<std::vector<int> > faces_;
 public:
-	Model(const char *filename);
+	Model(const char* filename);
 	~Model();
 	int nverts();
 	int nfaces();
 	Vec3f vert(int i);
+	Vec2f text(int i);
+	Vec3f norm(int i);
 	std::vector<int> face(int idx);
 };
 

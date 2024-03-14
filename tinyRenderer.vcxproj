@@ -134,6 +134,7 @@
   <ItemGroup>
     <ClInclude Include="src\geometry.h" />
     <ClInclude Include="src\model.h" />
+    <ClInclude Include="src\Texture.h" />
     <ClInclude Include="src\tgaimage.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

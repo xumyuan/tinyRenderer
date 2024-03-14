@@ -3,12 +3,14 @@
 #include "geometry.h"
 #include "tgaimage.h"
 #include "model.h"
+#include "Texture.h"
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
 const TGAColor green = TGAColor(0, 255, 0, 255);
 
 Model* model = NULL;
+TGAImage tex;
 const int width = 800;
 const int height = 800;
 
@@ -70,7 +72,7 @@ Vec3f barycentric(Vec3f* pts, Vec3f P) {
 	return Vec3f(-1, 1, 1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
-void triangle(Vec3f* pts, TGAImage& image, TGAColor color, float* zbuffer) {
+void triangle(Vec3f* pts, Vec2f* uvs, TGAImage& image, TGAColor color, float* zbuffer) {
 	Vec2f bboxmin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
 	Vec2f bboxmax(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
 	Vec2f clamp(image.get_width() - 1, image.get_height() - 1);
@@ -90,7 +92,14 @@ void triangle(Vec3f* pts, TGAImage& image, TGAColor color, float* zbuffer) {
 			for (int i = 0; i < 3; i++) P.z += pts[i][2] * bc_screen[i];
 			if (zbuffer[int(P.x + P.y * width)] < P.z) {
 				zbuffer[int(P.x + P.y * width)] = P.z;
-				image.set(P.x, P.y, color);
+				Vec2f uv(0, 0);
+				for (int i = 0; i < 3; i++) {
+					uv.u += bc_screen[i] * uvs[i].u;
+					uv.v += bc_screen[i] * uvs[i].v;
+				}
+				auto c = Texture(tex, uv.u, uv.v);
+
+				image.set(P.x, P.y, c);
 			}
 		}
 	}
@@ -125,9 +134,12 @@ void renderTriangleModel(Model* model, TGAImage& image) {
 		std::vector<int> face = model->face(i);
 		Vec3f screen_coords[3];
 		Vec3f world_coords[3];
+		Vec2f uvs[3];
 		for (int j = 0; j < 3; j++) {
 			// 顶点坐标
 			world_coords[j] = model->vert(face[j]);
+			// 纹理坐标
+			uvs[j] = model->text(face[j + 3]);
 			// 屏幕坐标
 			screen_coords[j] = world2screen(world_coords[j]);
 		}
@@ -139,7 +151,7 @@ void renderTriangleModel(Model* model, TGAImage& image) {
 		float intensity = n * light_dir;
 
 		if (intensity > 0)
-			triangle(screen_coords, image,
+			triangle(screen_coords, uvs, image,
 				TGAColor(intensity * 255, intensity * 255, intensity * 255, 255),
 				zbuffer);
 	}
@@ -153,11 +165,13 @@ int main(int argc, char** argv) {
 		model = new Model("model/african_head.obj");
 	}
 
+	tex.read_tga_file("model/african_head_diffuse.tga");
+	tex.flip_vertically();
+
 	TGAImage image(width, height, TGAImage::RGB);
 	renderTriangleModel(model, image);
 	image.flip_vertically(); // 将图像原点（0，0）放在左下角 
-	image.write_tga_file("resImg/head_z.tga");
-
+	image.write_tga_file("resImg/head_texture.tga");
 
 	return 0;
 }
