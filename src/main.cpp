@@ -13,6 +13,38 @@ Model* model = NULL;
 TGAImage tex;
 const int width = 800;
 const int height = 800;
+const int depth = 255;
+
+Vec3f camera(0, 0, 3);
+
+// 将4*1的矩阵转为三维向量
+Vec3f m2v(Matrix m) {
+	return Vec3f(
+		m[0][0] / m[3][0],
+		m[1][0] / m[3][0],
+		m[2][0] / m[3][0]);
+}
+
+Matrix v2m(Vec3f v) {
+	Matrix m(4, 1);
+	m[0][0] = v.x;
+	m[1][0] = v.y;
+	m[2][0] = v.z;
+	m[3][0] = 1.f;
+	return m;
+}
+
+Matrix viewport(int x, int y, int w, int h) {
+	Matrix m = Matrix::identity(4);
+	m[0][3] = x + w / 2.f;
+	m[1][3] = y + h / 2.f;
+	m[2][3] = 0.0f;
+
+	m[0][0] = w / 2.f;
+	m[1][1] = h / 2.f;
+	m[2][2] = 1.0f;
+	return m;
+}
 
 void line(int x0, int y0, int x1, int y1, TGAImage& image, TGAColor color) {
 	bool steep = false;
@@ -72,7 +104,18 @@ Vec3f barycentric(Vec3f* pts, Vec3f P) {
 	return Vec3f(-1, 1, 1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
-void triangle(Vec3f* pts, Vec2f* uvs, TGAImage& image, TGAColor color, float* zbuffer) {
+Vec2f uvCorrecion(Vec3f* worlds, Vec3f bc_screen, Vec2f* uvs) {
+	auto alpha = bc_screen[0] / worlds[0][2];
+	auto beta = bc_screen[1] / worlds[1][2];
+	auto gamma = bc_screen[2] / worlds[2][2];
+	auto denominator = alpha + beta + gamma;
+
+	Vec2f uv((alpha * uvs[0].u + beta * uvs[1].u + gamma * uvs[2].u) / denominator,
+		(alpha * uvs[0].v + beta * uvs[1].v + gamma * uvs[2].v) / denominator);
+	return uv;
+}
+
+void triangle(Vec3f* pts, Vec2f* uvs, Vec3f* worlds, TGAImage& image, TGAColor color, float* zbuffer) {
 	Vec2f bboxmin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
 	Vec2f bboxmax(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
 	Vec2f clamp(image.get_width() - 1, image.get_height() - 1);
@@ -88,8 +131,9 @@ void triangle(Vec3f* pts, Vec2f* uvs, TGAImage& image, TGAColor color, float* zb
 		for (P.y = bboxmin.y; P.y <= bboxmax.y; P.y++) {
 			Vec3f bc_screen = barycentric(pts, P);
 			if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0) continue;
-			P.z = 0;
-			for (int i = 0; i < 3; i++) P.z += pts[i][2] * bc_screen[i];
+			P.z = 0.0f;
+			for (int i = 0; i < 3; i++) P.z += (float)bc_screen[i] * pts[i][2];
+			//P.z = 1.0f / P.z;
 			if (zbuffer[int(P.x + P.y * width)] < P.z) {
 				zbuffer[int(P.x + P.y * width)] = P.z;
 				Vec2f uv(0, 0);
@@ -97,6 +141,7 @@ void triangle(Vec3f* pts, Vec2f* uvs, TGAImage& image, TGAColor color, float* zb
 					uv.u += bc_screen[i] * uvs[i].u;
 					uv.v += bc_screen[i] * uvs[i].v;
 				}
+				//auto uv = uvCorrecion(worlds, bc_screen, uvs);
 				auto c = Texture(tex, uv.u, uv.v);
 
 				image.set(P.x, P.y, c);
@@ -126,6 +171,13 @@ Vec3f world2screen(Vec3f v) {
 
 void renderTriangleModel(Model* model, TGAImage& image) {
 	Vec3f light_dir(0, 0, -1);
+	// 投影矩阵
+	Matrix Projection = Matrix::identity(4);
+	Projection[3][2] = -1.f / camera.z;
+
+	// 视口变换矩阵
+	Matrix ViewPort = viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
+
 	// zbuffer 初始化
 	float* zbuffer = new float[width * height];
 	for (int i = width * height; i--; zbuffer[i] = -std::numeric_limits<float>::max());
@@ -137,11 +189,13 @@ void renderTriangleModel(Model* model, TGAImage& image) {
 		Vec2f uvs[3];
 		for (int j = 0; j < 3; j++) {
 			// 顶点坐标
-			world_coords[j] = model->vert(face[j]);
+			auto v = model->vert(face[j]);
 			// 纹理坐标
 			uvs[j] = model->text(face[j + 3]);
 			// 屏幕坐标
-			screen_coords[j] = world2screen(world_coords[j]);
+			screen_coords[j] = world2screen(m2v(Projection * v2m(v)));
+
+			world_coords[j] = v;
 		}
 		Vec3f n = (world_coords[2] - world_coords[0]) ^
 			(world_coords[1] - world_coords[0]);
@@ -151,10 +205,12 @@ void renderTriangleModel(Model* model, TGAImage& image) {
 		float intensity = n * light_dir;
 
 		if (intensity > 0)
-			triangle(screen_coords, uvs, image,
+			triangle(screen_coords, uvs, world_coords, image,
 				TGAColor(intensity * 255, intensity * 255, intensity * 255, 255),
 				zbuffer);
 	}
+
+	delete[]zbuffer;
 }
 
 int main(int argc, char** argv) {
@@ -171,7 +227,8 @@ int main(int argc, char** argv) {
 	TGAImage image(width, height, TGAImage::RGB);
 	renderTriangleModel(model, image);
 	image.flip_vertically(); // 将图像原点（0，0）放在左下角 
-	image.write_tga_file("resImg/head_texture.tga");
+	image.write_tga_file("resImg/head_pv.tga");
 
+	delete model;
 	return 0;
 }
