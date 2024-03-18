@@ -42,6 +42,8 @@ public:
 	TGAColor normal(float u, float v);
 
 	inline Texture* getDiffuse() { return diffusemap_; }
+	inline Texture* getNormal() { return normalmap_; }
+	inline Texture* getSpec() { return specularmap_; }
 
 };
 
