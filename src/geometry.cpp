@@ -4,11 +4,24 @@
 #include <iostream>
 #include "geometry.h"
 
-template <> template <> Vec3<int>::Vec3(const Vec3<float>& v) : x(int(v.x + .5)), y(int(v.y + .5)), z(int(v.z + .5)) {
+// float 转 int
+template <> template <> Vec2<int>::Vec2(const Vec2<float>& v) : x(int(v.x + .5)), y(int(v.y + .5)) {
+}
+// int 转 float
+template <> template <> Vec2<float>::Vec2(const Vec2<int>& v) : x(v.x), y(v.y) {
 }
 
+// float 转 int
+template <> template <> Vec3<int>::Vec3(const Vec3<float>& v) : x(int(v.x + .5)), y(int(v.y + .5)), z(int(v.z + .5)) {
+}
+// int 转 float
 template <> template <> Vec3<float>::Vec3(const Vec3<int>& v) : x(v.x), y(v.y), z(v.z) {
 }
+// float 转 int
+template <> template <> Vec4<int>::Vec4(const Vec4<float>& v) : x(int(v.x + .5)), y(int(v.y + .5)), z(int(v.z + .5)), w(int(v.w + .5)) {}
+// int 转 float
+template <> template <> Vec4 <float>::Vec4(const Vec4<int>& v) : x(v.x), y(v.y), z(v.z), w(v.w) {}
+
 
 // 默认全部用0.f初始化
 Matrix::Matrix(int r, int c) : m(std::vector<std::vector<float> >(r, std::vector<float>(c, 0.f))), rows(r), cols(c) { }

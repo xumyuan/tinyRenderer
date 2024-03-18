@@ -25,7 +25,7 @@ Model::Model(const char* filename) : verts_(), faces_() {
 			Vec2f t;
 			iss >> t.raw[0];
 			iss >> t.raw[1];
-			texts_.push_back(t);
+			uvs_.push_back(t);
 		}
 		else if (!line.compare(0, 3, "vn ")) {
 			iss >> trash >> trash;
@@ -55,11 +55,13 @@ Model::Model(const char* filename) : verts_(), faces_() {
 		}
 	}
 	std::cerr << "# v# " << verts_.size() << " f# " << faces_.size() << std::endl;
+	load_texture(filename, "_diffuse.tga", 0);
+	load_texture(filename, "_nm.tga", 1);
+	load_texture(filename, "_spec.tga", 2);
 }
 
 Model::~Model() {
 }
-
 // ¶¥µã¸öÊý
 int Model::nverts() {
 	return (int)verts_.size();
@@ -77,11 +79,55 @@ Vec3f Model::vert(int i) {
 	return verts_[i];
 }
 
-Vec2f Model::text(int i) {
-	return texts_[i];
+Vec3f Model::vert(int iface, int nthvert) {
+	return verts_[faces_[iface][nthvert]];
+}
+
+Vec2f Model::uv(int i) {
+	return uvs_[i];
+}
+
+Vec2f Model::uv(int iface, int nthvert) {
+	return uvs_[faces_[iface][nthvert + 3]];
 }
 
 Vec3f Model::norm(int i) {
 	return norms_[i];
 }
 
+Vec3f Model::norm(int iface, int nthvert) {
+	return norms_[faces_[iface][nthvert + 6]];
+}
+
+void Model::load_texture(std::string filename, const char* suffix, int tex) {
+	std::string texfile(filename);
+	size_t dot = texfile.find_last_of(".");
+	TGAImage* img = new TGAImage();
+	if (dot != std::string::npos) {
+		texfile = texfile.substr(0, dot) + std::string(suffix);
+		std::cerr << "texture file " << texfile << " loading " << (img->read_tga_file(texfile.c_str()) ? "ok" : "failed") << std::endl;
+		img->flip_vertically();
+		switch (tex)
+		{
+		case 0:
+			diffusemap_ = new Texture(img);
+			break;
+		case 1:
+			normalmap_ = new Texture(img);
+			break;
+		case 2:
+			specularmap_ = new Texture(img);
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+TGAColor Model::diffuse(Vec2f uv) { return diffusemap_->sampleTex(uv); }
+TGAColor Model::specular(Vec2f uv) { return specularmap_->sampleTex(uv); }
+TGAColor Model::normal(Vec2f uv) { return normalmap_->sampleTex(uv); }
+
+TGAColor Model::diffuse(float u, float v) { return diffusemap_->sampleTex(u, v); }
+TGAColor Model::specular(float u, float v) { return specularmap_->sampleTex(u, v); }
+TGAColor Model::normal(float u, float v) { return normalmap_->sampleTex(u, v); }
