@@ -14,6 +14,9 @@ Model* model = NULL;
 float* shadowbuffer = nullptr;
 const int width = 800;
 const int height = 800;
+
+const int shadowWidth = 1600;
+const int shadowHeight = 1600;
 Matrix M;
 
 Texture* depthTexture = nullptr;
@@ -57,9 +60,9 @@ struct Shader :public IShader {
 		auto shadowCoord = lightSpacePos;
 
 		float shadow = 0.0;
-		float bias = 28.0f;
-		if (shadowCoord.x >= 0 && shadowCoord.x < width && shadowCoord.y >= 0 && shadowCoord.y < height) {
-			float closestDepth = shadowbuffer[int(shadowCoord.x + 0.5f) + int(shadowCoord.y + 0.5f) * width];
+		float bias = 20.0f;
+		if (shadowCoord.x >= 0 && shadowCoord.x < shadowWidth && shadowCoord.y >= 0 && shadowCoord.y < shadowHeight) {
+			float closestDepth = shadowbuffer[int(shadowCoord.x + 0.5f) + int(shadowCoord.y + 0.5f) * shadowWidth];
 			bias = std::max(0.05f * (1.0f - angle), bias);
 			shadow = shadowCoord.z < closestDepth - bias ? 1.0 : 0.0;
 		}
@@ -98,8 +101,6 @@ struct Shader :public IShader {
 		auto n = normalMap->sampleTex(uv);
 
 		Vec3f normal = Vec3f(2 * n.r - 1, 2 * n.g - 1, 2 * n.b - 1).normalize();
-
-
 
 		Vec3f viewDir = (eye - FragPos).normalize();
 		auto halfDir = (lightDir + viewDir).normalize();
@@ -156,9 +157,9 @@ void renderLineModel(Model* model, TGAImage& image) {
 }
 
 void renderDepth(Model* model, TGAImage& image) {
-	shadowbuffer = new float[width * height];
+	shadowbuffer = new float[shadowWidth * shadowHeight];
 	lookat(light_pos, center, up);
-	viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
+	viewport(shadowWidth / 8, shadowHeight / 8, shadowWidth * 3 / 4, shadowHeight * 3 / 4);
 	projection(0);
 
 	DepthShader depthShader;
@@ -219,10 +220,10 @@ int main(int argc, char** argv) {
 	else {
 		model = new Model("model/african_head.obj");
 	}
-	TGAImage depth(width, height, TGAImage::RGB);
+	TGAImage depth(shadowWidth, shadowHeight, TGAImage::RGB);
 	renderDepth(model, depth);
 	depth.flip_vertically(); // 将图像原点（0，0）放在左下角
-	depth.write_tga_file("resImg/depth.tga");
+	depth.write_tga_file("resImg/high_depth.tga");
 
 	depthTexture = new Texture(&depth);
 
@@ -231,7 +232,7 @@ int main(int argc, char** argv) {
 	TGAImage image(width, height, TGAImage::RGB);
 	renderTriangleModel(model, image);
 	image.flip_vertically(); // 将图像原点（0，0）放在左下角 
-	image.write_tga_file("resImg/head_shadow.tga");
+	image.write_tga_file("resImg/head_high_shadow.tga");
 
 	delete model;
 	return 0;
