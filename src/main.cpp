@@ -15,7 +15,6 @@ const int width = 800;
 const int height = 800;
 
 Vec3f light_dir = Vec3f(-1, -1, -1).normalize();
-Vec3f camera(0, 0, 3);
 Vec3f eye(1, 1, 3);
 Vec3f center(0, 0, 0);
 Vec3f up(0, 1, 0);
@@ -67,13 +66,14 @@ struct Shader :public IShader {
 
 		Vec3f normal = Vec3f(2 * n.r - 1, 2 * n.g - 1, 2 * n.b - 1).normalize();
 
-		Vec3f viewDir = (camera - FragPos).normalize();
+		Vec3f viewDir = (eye - FragPos).normalize();
 		auto halfDir = (lightDir + viewDir).normalize();
 		normal = m2v(normalMatrix * v2m(normal)).normalize();
 
 		float specStrength = pow(std::max(0.0f, normal * halfDir), spec);
 		float diffStrength = std::max(0.0f, normal * lightDir);
 		float ambientStrength = 0.05;
+
 		fragColor = diff * diffStrength * 1.0 + TGAColor(spec, spec, spec, 255) * specStrength * 0.6 + diff * ambientStrength;
 
 		return fragColor;
@@ -102,17 +102,13 @@ Vec3f world2screen(Vec3f v) {
 
 void renderTriangleModel(Model* model, TGAImage& image) {
 	// ModelView矩阵
-	lookat(eye, center, Vec3f(0, 1, 0));
+	lookat(eye, center, up);
 	// 视口变换矩阵
 	viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
 	// 投影矩阵
 	projection(-1.f / (eye - center).norm());
 
-	std::cerr << ModelView << std::endl;
-	std::cerr << Projection << std::endl;
-	std::cerr << Viewport << std::endl;
-	Matrix z = (Viewport * Projection * ModelView);
-	std::cerr << z << std::endl;
+	light_dir = m2v((ModelView * v2m(light_dir))).normalize();
 
 	//法线矩阵
 	Matrix normalMIT = (Projection * ModelView).inverse().transpose();
@@ -149,7 +145,7 @@ int main(int argc, char** argv) {
 	TGAImage image(width, height, TGAImage::RGB);
 	renderTriangleModel(model, image);
 	image.flip_vertically(); // 将图像原点（0，0）放在左下角 
-	image.write_tga_file("resImg/head_light_shader.tga");
+	image.write_tga_file("resImg/head_light_shader_.tga");
 
 	delete model;
 	return 0;
